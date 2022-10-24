@@ -1,4 +1,3 @@
-from typing import List
 from fastapi import FastAPI, Query, Body, status, Response
 from pydantic import BaseModel, Field
 
@@ -151,7 +150,8 @@ def get_inventory(
     return filtered_inventory
     
 
-@app.get("/inventory/{item_id}", description="Retorna um item específico do inventário", )
+@app.get("/inventory/{item_id}", 
+    description="Retorna um item específico do inventário", )
 def get_inventory(item_id: str, response: Response):
 
     filtered_inventory = inventory.get(item_id)
@@ -162,7 +162,8 @@ def get_inventory(item_id: str, response: Response):
         response.status_code = status.HTTP_404_NOT_FOUND
         return {"error": f"Item with id {item_id} not found"}
 
-@app.post("/inventory/")
+@app.post("/inventory/",
+    description="Adiciona um item ao inventário")
 def create_inventory(
     response: Response,
     item: Item = Body(
@@ -219,7 +220,9 @@ def create_inventory(
         response.status_code = status.HTTP_201_CREATED
         return {"message": "Item created successfully", "item": item}
 
-@app.patch("/inventory/{item_id}")
+@app.patch("/inventory/{item_id}",
+    description="Atualiza dados de um item específico do inventário", 
+    )
 def update_inventory_item(
     item_id: str, 
     response: Response,
@@ -243,7 +246,8 @@ def update_inventory_item(
         response.status_code = status.HTTP_404_NOT_FOUND
         return {"error": f"Item with id {item_id} not found"}
 
-@app.delete("/inventory/{item_id}")
+@app.delete("/inventory/{item_id}",
+    description="Remove um item específico do inventário")
 def remove_inventory_item(item_id: str, response: Response):
     stored_item = inventory.get(item_id)
     if stored_item:
