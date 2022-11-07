@@ -1,4 +1,4 @@
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Query, Body, status, Response
 from sqlalchemy.orm import Session
 
 import crud, models, schemas
@@ -17,37 +17,101 @@ def get_db():
     finally:
         db.close()
 
+#! PRODUCTS
+@app.get("/products/", response_model=list[schemas.Product])
+def read_products(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    products = crud.get_all_products(db, skip=skip, limit=limit)
+    return products
 
-@app.post("/users/", response_model=schemas.User)
-def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
-    db_user = crud.get_user_by_email(db, email=user.email)
-    if db_user:
-        raise HTTPException(status_code=400, detail="Email already registered")
-    return crud.create_user(db=db, user=user)
+@app.get("/products/{product_id}", response_model=schemas.Product)
+def read_product(product_id: int, db: Session = Depends(get_db)):
+    db_product = crud.get_product_by_id(db, product_id=product_id)
+    if db_product is None:
+        raise HTTPException(status_code=404, detail="Product not found")
+    return db_product
+
+@app.post("/products/", response_model=schemas.Product)
+def create_product(product: schemas.ProductBase, db: Session = Depends(get_db)):
+    db_product = crud.get_product_by_name(db, name=product.name)
+    if db_product:
+        raise HTTPException(status_code=400, detail="Product already registered")
+    return crud.create_product(db=db, Product=product)
+
+@app.put("/products/{product_id}", response_model=schemas.Product)
+def update_product(product_id: int, product: schemas.ProductBase, db: Session = Depends(get_db)):
+    db_product = crud.get_product_by_id(db, product_id=product_id)
+    if db_product is None:
+        raise HTTPException(status_code=404, detail="Product not found")
+    db_product.name = product.name
+    db_product.description = product.description
+    db_product.price = product.price
+    db.commit()
+    return db_product
 
 
-@app.get("/users/", response_model=list[schemas.User])
-def read_users(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    users = crud.get_users(db, skip=skip, limit=limit)
-    return users
+@app.delete("/products/{product_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_product(product_id: int, db: Session = Depends(get_db)):
+    db_product = crud.get_product_by_id(db, product_id=product_id)
+    if db_product is None:
+        raise HTTPException(status_code=404, detail="Product not found")
+    db.delete(db_product)
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-@app.get("/users/{user_id}", response_model=schemas.User)
-def read_user(user_id: int, db: Session = Depends(get_db)):
-    db_user = crud.get_user(db, user_id=user_id)
-    if db_user is None:
-        raise HTTPException(status_code=404, detail="User not found")
-    return db_user
+#! TRANSACTIONS
+@app.get("/products/{product_id}/transactions", response_model=list[schemas.Transaction])
+def read_transactions(product_id: int, db: Session = Depends(get_db)):
+    db_product = crud.get_product_by_id(db, product_id=product_id)
+    if db_product is None:
+        raise HTTPException(status_code=404, detail="Product not found")
+    return db_product.transactions
 
+@app.post("/products/{product_id}/transactions", response_model=schemas.Transaction)
+def create_transaction(product_id: int, transaction: schemas.TransactionBase, db: Session = Depends(get_db)):
+    db_product = crud.get_product_by_id(db, product_id=product_id)
+    if db_product is None:
+        raise HTTPException(status_code=404, detail="Product not found")
 
-@app.post("/users/{user_id}/items/", response_model=schemas.Item)
-def create_item_for_user(
-    user_id: int, item: schemas.ItemCreate, db: Session = Depends(get_db)
-):
-    return crud.create_user_item(db=db, item=item, user_id=user_id)
+    if transaction.type == "remove" and db_product.amount < transaction.amount:
+        raise HTTPException(status_code=400, detail="Not enough products in stock")
+    else:
+        db_transaction = crud.create_transaction(db=db, transaction=transaction, product_id=product_id)
+        db.add(db_transaction)
+        if transaction.type == "add":
+            db_product.amount += transaction.amount
+        elif transaction.type == "remove":
+            db_product.amount -= transaction.amount
+        db.commit()
+        db.refresh(db_transaction)
+        return db_transaction
 
+@app.put("/products/{product_id}/transactions/{transaction_id}", response_model=schemas.Transaction)
+def update_transaction(product_id: int, transaction_id: int, transaction: schemas.TransactionBase, db: Session = Depends(get_db)):
+    db_product = crud.get_product_by_id(db, product_id=product_id)
+    if db_product is None:
+        raise HTTPException(status_code=404, detail="Product not found")
+    db_transaction = crud.get_transaction_by_id(db, transaction_id=transaction_id)
+    if db_transaction is None:
+        raise HTTPException(status_code=404, detail="Transaction not found")
 
-@app.get("/items/", response_model=list[schemas.Item])
-def read_items(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    items = crud.get_items(db, skip=skip, limit=limit)
-    return items
+    if transaction.type == "remove" and db_product.amount < transaction.amount:
+        raise HTTPException(status_code=400, detail="Not enough products in stock")
+    else:
+        db_transaction.type = transaction.type
+        db_transaction.amount = transaction.amount
+        db_product.amount += transaction.amount
+        db.commit()
+        return db_transaction
+@app.delete("/products/{product_id}/transactions/{transaction_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_transaction(product_id: int, transaction_id: int, db: Session = Depends(get_db)):
+    db_product = crud.get_product_by_id(db, product_id=product_id)
+    if db_product is None:
+        raise HTTPException(status_code=404, detail="Product not found")
+    db_transaction = crud.get_transaction_by_id(db, transaction_id=transaction_id)
+    if db_transaction is None:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+    db.delete(db_transaction)
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+

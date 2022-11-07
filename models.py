@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, ForeignKey, Integer, String
+from sqlalchemy import Column, ForeignKey, Integer, String, Float
 from sqlalchemy.orm import relationship
 
 from database import Base
@@ -8,17 +8,18 @@ class Transaction(Base):
     __tablename__ = "transactions"
 
     id = Column(Integer, primary_key=True)
-    item_id = Column(Integer, ForeignKey("items.id"))
+    product_id = Column(Integer, ForeignKey("items.id"))
     type = Column(String(10))
     amount = Column(Integer)
 
 
-class Item(Base):
+class Product(Base):
     __tablename__ = "items"
 
     id = Column(Integer, primary_key=True)
-    title = Column(String(30))
+    name = Column(String(30))
     description = Column(String(50))
-    owner_id = Column(Integer, ForeignKey("users.id"))
+    price = Column(Float)
+    amount = Column(Integer)
 
-    transactions = relationship("Transaction", back_populates="transactions")
+    transactions = relationship("Transaction", )

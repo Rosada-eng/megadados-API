@@ -2,35 +2,54 @@ from sqlalchemy.orm import Session
 
 import models, schemas
 
+def get_product_by_id(db: Session, product_id: int):
+    return db.query(models.Product).filter(models.Product.id == product_id).first()
 
-def get_user(db: Session, user_id: int):
-    return db.query(models.User).filter(models.User.id == user_id).first()
+def get_product_by_name(db: Session, name: str):
+    return db.query(models.Product).filter(models.Product.name == name).first()
 
+def get_all_products(db: Session, skip: int = 0, limit: int = 100):
+    return db.query(models.Product).offset(skip).limit(limit).all()
 
-def get_user_by_email(db: Session, email: str):
-    return db.query(models.User).filter(models.User.email == email).first()
-
-
-def get_users(db: Session, skip: int = 0, limit: int = 100):
-    return db.query(models.User).offset(skip).limit(limit).all()
-
-
-def create_user(db: Session, user: schemas.UserCreate):
-    fake_hashed_password = user.password + "notreallyhashed"
-    db_user = models.User(email=user.email, hashed_password=fake_hashed_password)
-    db.add(db_user)
+def create_product(db: Session, Product: schemas.Product):
+    db_Product = models.Product(**Product.dict())
+    db.add(db_Product)
     db.commit()
-    db.refresh(db_user)
-    return db_user
+    db.refresh(db_Product)
+    return db_Product
 
-
-def get_items(db: Session, skip: int = 0, limit: int = 100):
-    return db.query(models.Item).offset(skip).limit(limit).all()
-
-
-def create_user_item(db: Session, item: schemas.ItemCreate, user_id: int):
-    db_item = models.Item(**item.dict(), owner_id=user_id)
-    db.add(db_item)
+def update_product(db: Session, product_id: int, Product: schemas.Product):
+    db_Product = get_product_by_id(db, product_id=product_id)
+    db_Product.name = Product.name
+    db_Product.description = Product.description
+    db_Product.price = Product.price
+    db_Product.amount = Product.amount
     db.commit()
-    db.refresh(db_item)
-    return db_item
+    return db_Product
+
+def delete_product(db: Session, product_id: int):
+    db_Product = get_product_by_id(db, product_id=product_id)
+    db.delete(db_Product)
+    db.commit()
+    return db_Product
+
+def get_transactions_by_product_id(db: Session, product_id: int):
+    return db.query(models.Transaction).filter(models.Transaction.product_id == product_id).all()
+
+def get_transaction_by_id(db: Session, transaction_id: int):
+    return db.query(models.Transaction).filter(models.Transaction.id == transaction_id).first()
+    
+def create_transaction(db: Session, transaction: schemas.Transaction, product_id: int):
+    db_transaction = models.Transaction(**transaction.dict(), product_id=product_id)
+    db.add(db_transaction)
+    db.commit()
+    db.refresh(db_transaction)
+    return db_transaction
+
+def delete_transaction(db: Session, transaction_id: int):
+    db_transaction = db.query(models.Transaction).filter(models.Transaction.id == transaction_id).first()
+    db.delete(db_transaction)
+    db.commit()
+    return db_transaction
+
+

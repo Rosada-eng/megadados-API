@@ -4,11 +4,8 @@ from pydantic import BaseModel, Field
 
 """
 
-class Item(BaseModel):
-    id: str = Field(
-        default=None,
-        description="Id único do produto. Não precisa ser informado."
-        )
+class ProductBase(BaseModel):
+    
     name: str = Field(
         ...,
         title='Nome do Produto',
@@ -28,7 +25,7 @@ class Item(BaseModel):
         description='(obrigatório) Preço do Produto. Deve ser maior que zero.', 
         gt=0, 
     )
-    quantity: int = Field(
+    amount: int = Field(
         default=1,
         ge=0,
         title='Quantidade',
@@ -38,17 +35,15 @@ class Item(BaseModel):
     class Config:
         orm_mode = True
 
-
-class Transaction(BaseModel):
-    id: str = Field(
+class Product(ProductBase):
+    id: int = Field(
         default=None,
-        description="Id único da transação. Não precisa ser informado."
+        description="Id único do produto. Não precisa ser informado."
         )
-    item_id: str = Field(
-        ...,
-        title='Id do Produto',
-        description="(obrigatório) Id do produto",
-        )
+
+class TransactionBase(BaseModel):
+    
+    
     type: str = Field(
         ...,
         title='Tipo da Transação (entrada ou saída)',
@@ -64,3 +59,15 @@ class Transaction(BaseModel):
 
     class Config:
         orm_mode = True
+
+
+class Transaction(TransactionBase):
+    id: int = Field(
+        default=None,
+        description="Id único da transação. Não precisa ser informado."
+        )
+    product_id: int = Field(
+        ...,
+        title='Id do Produto',
+        description="(obrigatório) Id do produto",
+        )
